@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>火箭动力发射模拟（含重力计算）</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 横屏适配 */
+        @media (orientation: portrait) {
+            body {
+                transform: rotate(-90deg);
+                transform-origin: left top;
+                width: 100vh;
+                height: 100vw;
+                overflow-x: hidden;
+                position: absolute;
+                top: 100%;
+                left: 0;
+            }
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #fff;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        /* 火箭造型（与前版相同，优化后保持美观） */
+        .rocket {
+            width: 60px;
+            height: 180px;
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+
+        .rocket-body {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, 
+                #f0f0f0 0%, 
+                #ffffff 20%, 
+                #e0e0e0 50%, 
+                #d0d0d0 80%, 
+                #c0c0c0 100%
+            );
+            border-radius: 40% 40% 15% 15%;
+            position: relative;
+            border: 2px solid #666;
+        }
+
+        .nose-cone {
+            width: 70%;
+            height: 30%;
+            background: linear-gradient(180deg, #ffd700 0%, #ffb700 100%);
+            position: absolute;
+            top: -15%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 50% 50% 0 0;
+            border: 2px solid #cc9900;
+        }
+
+        .window {
+            width: 25px;
+            height: 25px;
+            background: radial-gradient(circle at 65% 35%, #87ceeb 0%, #00bfff 100%);
+            border-radius: 50%;
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 2px solid #333;
+            box-shadow: 0 0 5px rgba(255,255,255,0.5);
+        }
+
+        .fin {
+            width: 40px;
+            height: 60px;
+            background: linear-gradient(45deg, #ff4444 0%, #cc0000 100%);
+            position: absolute;
+            bottom: 0;
+            z-index: -1;
+            border: 2px solid #990000;
+        }
+
+        .fin-left {
+            left: -30px;
+            border-radius: 100% 0 0 40%;
+            transform: skewY(-20deg);
+        }
+
+        .fin-right {
+            right: -30px;
+            border-radius: 0 100% 40% 0;
+            transform: skewY(20deg);
+        }
+
+        .flame-container {
+            width: 100%;
+            height: 80px;
+            position: absolute;
+            bottom: -80px;
+            left: 0;
+            overflow: hidden;
+        }
+
+        .flame {
+            width: 30px;
+            height: 100px;
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(to bottom, 
+                transparent 10%,
+                #ff6b6b 20%,
+                #ff8e53 30%,
+                #ffd700 40%,
+                #fff 50%,
+                transparent 100%
+            );
+            background-size: 100% 200%;
+            animation: flame-flow 0.2s linear infinite;
+            filter: blur(3px);
+            opacity: 0.9;
+            border-radius: 50% 50% 20% 20%;
+        }
+
+        @keyframes flame-flow {
+            0% { background-position: 0 0; height: 80px; }
+            50% { height: 90px; }
+            100% { background-position: 0 100%; height: 80px; }
+        }
+
+        /* 数据面板（调整位置） */
+        .data-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            line-height: 1.8;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px 20px;
+            border-radius: 8px;
+            border: 2px solid #0f0;
+            box-shadow: 0 0 10px rgba(0,255,0,0.3);
+        }
+
+        /* 输入框调整到左下角 */
+        .control {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            text-align: left;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #444;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .input-group label {
+            margin-right: 10px;
+            display: inline-block;
+            width: 80px;
+        }
+
+        .input-group input {
+            padding: 5px 10px;
+            width: 150px;
+            border: 2px solid #666;
+            border-radius: 5px;
+            background: #333;
+            color: white;
+            font-size: 16px;
+        }
+
+        #upload-audio {
+            color: #fff;
+            margin: 10px 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #start-btn {
+            padding: 12px 30px;
+            font-size: 18px;
+            background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            box-shadow: 0 3px 6px rgba(255,0,0,0.3);
+            margin-top: 10px;
+        }
+
+        #start-btn:hover {
+            transform: scale(1.05);
+        }
+
+        #start-btn:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 星空背景 -->
+        <div class="stars"></div>
+        
+        <!-- 火箭 -->
+        <div class="rocket">
+            <div class="rocket-body">
+                <div class="nose-cone"></div>
+                <div class="window"></div>
+                <div class="fin fin-left"></div>
+                <div class="fin fin-right"></div>
+            </div>
+            <div class="flame-container">
+                <div class="flame"></div>
+            </div>
+        </div>
+
+        <!-- 数据显示面板（移至右侧） -->
+        <div class="data-panel">
+            时间：<span id="time">0.00</span> 秒<br>
+            推力：<span id="thrust">0</span> N<br>
+            质量：<span id="mass">0</span> kg<br>
+            重力：<span id="gravity">0</span> N<br>
+            升力：<span id="net-force">0</span> N<br>
+            加速度：<span id="acceleration">0.00</span> m/s²<br>
+            速度：<span id="velocity">0.00</span> m/s<br>
+            高度：<span id="height">0.00</span> 米
+        </div>
+
+        <!-- 控制区域（移至左下角） -->
+        <div class="control">
+            <div class="input-group">
+                <label>推力 (N)：</label>
+                <input type="number" id="thrust-input" value="30000" min="1">
+            </div>
+            <div class="input-group">
+                <label>质量 (kg)：</label>
+                <input type="number" id="mass-input" value="2000" min="1">
+            </div>
+            <input type="file" id="upload-audio" accept="audio/*" placeholder="上传发射音效">
+            <br>
+            <button id="start-btn">点火发射</button>
+        </div>
+    </div>
+
+    <script>
+        const G = 9.8; // 重力加速度 (m/s²)
+        let rocket = document.querySelector('.rocket');
+        let flame = document.querySelector('.flame');
+        let audio = null;
+        let startTime = null;
+        let isLaunched = false;
+        let acceleration = 0;
+        const SCALE_FACTOR = 1.2; // 高度显示缩放因子
+
+        // 创建星空背景
+        function createStars() {
+            const starsContainer = document.querySelector('.stars');
+            for (let i = 0; i < 300; i++) {
+                let star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + 'vw';
+                star.style.top = Math.random() * 100 + 'vh';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                star.style.width = Math.random() * 2 + 'px';
+                star.style.height = Math.random() * 2 + 'px';
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // 输入验证与计算
+        function calculateForces() {
+            const thrust = parseFloat(document.getElementById('thrust-input').value);
+            const mass = parseFloat(document.getElementById('mass-input').value);
+            
+            if (isNaN(thrust) || thrust <= 0 || isNaN(mass) || mass <= 0) {
+                alert('请输入有效的正数值（推力和质量必须大于0）');
+                return null;
+            }
+
+            const gravity = mass * G; // 重力 F_g = m*g
+            const netForce = thrust - gravity; // 升力（合外力） F_net = F_thrust - F_g
+            const acceleration = netForce / mass; // 加速度 a = F_net/m
+
+            if (netForce <= 0) {
+                alert('推力不足！升力需大于0（当前升力：' + netForce.toFixed(2) + 'N）');
+                return null;
+            }
+
+            return { thrust, mass, gravity, netForce, acceleration };
+        }
+
+        // 上传音效处理
+        document.getElementById('upload-audio').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                audio = new Audio(URL.createObjectURL(file));
+            }
+        });
+
+        // 动画更新函数
+        function updateAnimation(timestamp) {
+            if (!startTime) startTime = timestamp;
+            const elapsed = (timestamp - startTime) / 1000; // 秒
+            
+            // 运动参数计算（匀加速直线运动）
+            const velocity = acceleration * elapsed;       // v = v0 + a*t（v0=0）
+            const height = 0.5 * acceleration * elapsed**2; // s = v0*t + 0.5*a*t²（v0=0）
+            
+            // 更新数据面板
+            document.getElementById('time').textContent = elapsed.toFixed(2);
+            document.getElementById('velocity').textContent = velocity.toFixed(2);
+            document.getElementById('height').textContent = height.toFixed(2);
+            document.getElementById('acceleration').textContent = acceleration.toFixed(2);
+            
+            // 更新火箭位置
+            rocket.style.bottom = (height * SCALE_FACTOR + 80) + 'px';
+            
+            // 持续动画
+            if (isLaunched) requestAnimationFrame(updateAnimation);
+        }
+
+        // 开始发射
+        document.getElementById('start-btn').addEventListener('click', function() {
+            if (isLaunched) return;
+
+            // 计算物理参数
+            const forces = calculateForces();
+            if (!forces) return;
+            
+            // 更新数据面板显示
+            document.getElementById('thrust').textContent = forces.thrust.toFixed(0);
+            document.getElementById('mass').textContent = forces.mass.toFixed(0);
+            document.getElementById('gravity').textContent = forces.gravity.toFixed(2);
+            document.getElementById('net-force').textContent = forces.netForce.toFixed(2);
+            acceleration = forces.acceleration;
+            
+            isLaunched = true;
+            flame.style.animationPlayState = 'running';
+            
+            // 播放音效
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play().catch(err => {
+                    console.log('请先允许浏览器播放音频');
+                });
+            }
+            
+            // 启动动画
+            requestAnimationFrame(updateAnimation);
+        });
+
+        // 初始化星空
+        createStars();
+    </script>
+</body>
+</html>
